@@ -319,7 +319,12 @@ let app = new Vue({
 
     pullData(selectedData, selectedRegion, updateSelectedCountries = true) {
 
-      if (selectedRegion != 'US') {
+      if (selectedRegion == 'US Counties') {
+        const type = (selectedData == 'Reported Deaths') ? 'deaths' : 'cases'
+        const url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv';
+        Plotly.d3.csv(url, (data) => this.processData(this.preprocessNYTCountyData(data, type), selectedRegion, updateSelectedCountries));
+      }
+      else if (selectedRegion != 'US') {
         let url;
         if (selectedData == 'Confirmed Cases') {
          url = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv';
@@ -371,6 +376,10 @@ let app = new Vue({
       return data.filter(e => e['Country/Region'] == selectedRegion)
           .map(e => Object.assign({}, e, {region: e['Province/State']}));
     },
+    filterByStateCounty(data, dates, selectedRegion) {
+      return data.filter(e => e['Country/Region'] == selectedRegion)
+          .map(e => Object.assign({}, e, {region: e['County'] + ' - ' + e['State']}));
+    },
 
     convertStateToCountry(data, dates, selectedRegion) {
       return data.filter(e => e['Province/State'] == selectedRegion)
@@ -396,6 +405,10 @@ let app = new Vue({
             grouped = grouped.concat(country);
           }
         }
+
+      } else if (selectedRegion == 'US Counties') {
+        grouped = this.filterByStateCounty(data, dates, selectedRegion)
+        .filter(e => !regionsToPullToCountryLevel.includes(e.region));
 
       } else {
         grouped = this.filterByCountry(data, dates, selectedRegion)
@@ -459,14 +472,25 @@ let app = new Vue({
       let recastData = {};
       data.forEach(e => {
         let st = recastData[e.state]  = (recastData[e.state] || {'Province/State': e.state, 'Country/Region': 'US', 'Lat': null, 'Long': null});
-        st[fixNYTDate(e.date)] = parseInt(e[type]);
+        st[this.fixNYTDate(e.date)] = parseInt(e[type]);
       });
       return Object.values(recastData);
+    },
 
-      function fixNYTDate(date) {
-        let tmp = date.split('-');
-        return `${tmp[1]}/${tmp[2]}/${tmp[0].substr(2)}`;
-      }
+    preprocessNYTCountyData(data, type) {
+      let recastData = {};
+      data.forEach(e => {
+        // The key (county + state) is long, but gives the user the ability to search for a state and quickly filter to just those counties.
+        // 'Washington' is both a state and a common county name, and filtering by that string still filters the list in a helpful way.
+        let cnty = recastData[e.county + ' - ' + e.state]  = (recastData[e.county + ' - ' + e.state] || {'State': e.state, 'County': e.county, 'Country/Region': 'US Counties', 'Unused Key': null});
+        cnty[this.fixNYTDate(e.date)] = parseInt(e[type]);
+      });
+      return Object.values(recastData);
+    },
+
+    fixNYTDate(date) {
+      let tmp = date.split('-');
+      return `${tmp[1]}/${tmp[2]}/${tmp[0].substr(2)}`;
     },
 
     formatDate(date) {
@@ -648,6 +672,8 @@ let app = new Vue({
         case 'Australia':
         case 'US':
           return 'States / Territories';
+        case 'US Counties':
+            return 'Counties'
         case 'China':
           return 'Provinces';
         case 'Canada':
@@ -907,7 +933,7 @@ let app = new Vue({
 
     selectedData: 'Confirmed Cases',
 
-    regions: ['World', 'US', 'China', 'Australia', 'Canada'],
+    regions: ['World', 'US', 'US Counties', 'China', 'Australia', 'Canada'],
 
     selectedRegion: 'World',
 
