@@ -933,7 +933,7 @@ let app = new Vue({
 
     selectedData: 'Confirmed Cases',
 
-    regions: ['World', 'US', 'US Counties', 'China', 'Australia', 'Canada'],
+    regions: [/*'World', 'US', */'US Counties'/*, 'China', 'Australia', 'Canada'*/],
 
     selectedRegion: 'World',
 
